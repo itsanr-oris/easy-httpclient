@@ -14,7 +14,7 @@
         "ext-json": "*",
         "ext-curl": "*",
         "psr/log": "~1.0",
-        "guzzlehttp/guzzle": "~6.0",
+        "guzzlehttp/guzzle": "~6.0|~7.0",
         "f-oris/easy-logger": "^1.0",
         "f-oris/easy-cache": "^1.0",
         "f-oris/easy-support": "^1.0"
