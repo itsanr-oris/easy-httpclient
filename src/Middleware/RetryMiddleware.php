@@ -6,7 +6,6 @@ use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Exception\ServerException;
-use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\ConnectException;
 
 /**
@@ -62,7 +61,7 @@ class RetryMiddleware implements MiddlewareInterface
             $retries,
             Request $request,
             Response $response = null,
-            RequestException $exception = null
+            $exception = null
         ) {
             if ($retries >= $this->retries()) {
                 return false;
