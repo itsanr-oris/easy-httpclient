@@ -1,10 +1,4 @@
-<?php
-/**
- * Created by PhpStorm.
- * User: f-oris
- * Date: 2019/8/21
- * Time: 6:18 PM
- */
+<?php /** @noinspection PhpUndefinedClassInspection */
 
 namespace Foris\Easy\HttpClient\Tests\Middleware;
 
@@ -16,9 +10,6 @@ use Foris\Easy\HttpClient\Test\HttpClientMiddlewareTestCase;
 
 /**
  * Class RetryMiddlewareTest
- * @package EasySmartProgram\Tests\Support\Http\Middleware
- * @author  f-oris <us@f-oris.me>
- * @version 1.0.0
  */
 class RetryMiddlewareTest extends HttpClientMiddlewareTestCase
 {
@@ -35,7 +26,7 @@ class RetryMiddlewareTest extends HttpClientMiddlewareTestCase
     /**
      * @return MiddlewareInterface
      */
-    public function middleware(): MiddlewareInterface
+    public function middleware()
     {
         $this->maxRetries = 1;
         $this->retryDelay = 100;

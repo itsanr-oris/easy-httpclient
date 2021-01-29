@@ -21,7 +21,7 @@ abstract class HttpClientMiddlewareTestCase extends TestCase
     /**
      * Set up
      */
-    public function setUp() : void
+    public function setUp()
     {
         parent::setUp();
         $this->mockHandler = new MockHandler();
@@ -38,11 +38,11 @@ abstract class HttpClientMiddlewareTestCase extends TestCase
      * @return $this
      */
     protected function appendResponse(
-        int $code = 200,
+        $code = 200,
         array $headers = [],
-        string $body = '',
-        string $version = '1.1',
-        string $reason = null
+        $body = '',
+        $version = '1.1',
+        $reason = null
     ) {
         $this->mockHandler->append(new Response($code, $headers, $body, $version, $reason));
         return $this;
@@ -69,7 +69,7 @@ abstract class HttpClientMiddlewareTestCase extends TestCase
     {
         $stack = HandlerStack::create($this->mockHandler);
         $middleware = $this->middleware();
-        $stack->unshift($middleware->callable(), $middleware->name());
+        $stack->unshift($middleware->callback(), $middleware->name());
 
         return new Client(['handler' => $stack]);
     }
@@ -79,5 +79,5 @@ abstract class HttpClientMiddlewareTestCase extends TestCase
      *
      * @return MiddlewareInterface
      */
-    abstract public function middleware() : MiddlewareInterface;
+    abstract public function middleware();
 }

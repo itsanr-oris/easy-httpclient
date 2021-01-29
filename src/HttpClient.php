@@ -1,4 +1,7 @@
-<?php
+<?php /** @noinspection PhpDeprecationInspection */
+/** @noinspection PhpParamsInspection */
+
+/** @noinspection PhpUndefinedClassInspection */
 
 namespace Foris\Easy\HttpClient;
 
@@ -69,7 +72,9 @@ class HttpClient
     public function __construct(array $config = [])
     {
         $this->setConfig($config);
-        $this->setResponseType($config['response_type'] ?? $this->defaultResponseType);
+
+        $responseType = isset($config['response_type']) ? $config['response_type'] : $this->defaultResponseType;
+        $this->setResponseType($responseType);
     }
 
     /**
@@ -128,9 +133,12 @@ class HttpClient
      */
     public function getResponseType()
     {
-        // reset to default response type
         $type = $this->responseType;
-        $this->setResponseType($this->config['response_type'] ?? $this->defaultResponseType);
+
+        // reset to default response type
+        $responseType = isset($this->config['response_type']) ? $this->config['response_type'] : $this->defaultResponseType;
+        $this->setResponseType($responseType);
+
         return $type;
     }
 
@@ -142,9 +150,9 @@ class HttpClient
      */
     public function pushMiddleware(MiddlewareInterface $middleware)
     {
-        $this->middleware[$middleware->name()] = $middleware->callable();
+        $this->middleware[$middleware->name()] = $middleware->callback();
         if ($this->handlerStack instanceof HandlerStack) {
-            $this->handlerStack->push($middleware->callable(), $middleware->name());
+            $this->handlerStack->push($middleware->callback(), $middleware->name());
         }
         return $this;
     }
@@ -155,7 +163,7 @@ class HttpClient
      * @param string $name
      * @return $this
      */
-    public function removeMiddleware(string $name)
+    public function removeMiddleware($name)
     {
         unset($this->middleware[$name]);
         if ($this->handlerStack instanceof HandlerStack) {
@@ -183,7 +191,7 @@ class HttpClient
      *
      * @return \GuzzleHttp\HandlerStack
      */
-    public function getHandlerStack(): HandlerStack
+    public function getHandlerStack()
     {
         if ($this->handlerStack) {
             return $this->handlerStack;
@@ -243,7 +251,7 @@ class HttpClient
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function get(
-        string $url,
+        $url,
         array $query = [],
         array $options = []
     ) {
@@ -260,7 +268,7 @@ class HttpClient
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function post(
-        string $url,
+        $url,
         array $data = [],
         array $options = []
     ) {
@@ -278,7 +286,7 @@ class HttpClient
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function postJson(
-        string $url,
+        $url,
         array $data = [],
         array $query = [],
         array $options = []
@@ -298,7 +306,7 @@ class HttpClient
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function upload(
-        string $url,
+        $url,
         array $files = [],
         array $form = [],
         array $query = [],
@@ -331,7 +339,7 @@ class HttpClient
      * @return mixed
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function request(string $url, $method = 'GET', $options = [])
+    public function request($url, $method = 'GET', $options = [])
     {
         $method = strtoupper($method);
 
@@ -347,10 +355,11 @@ class HttpClient
      *
      * @return array
      */
-    protected function fixJsonIssue(array $options): array
+    protected function fixJsonIssue(array $options)
     {
         if (isset($options['json']) && is_array($options['json'])) {
-            $options['headers'] = array_merge($options['headers'] ?? [], ['Content-Type' => 'application/json']);
+            $headers = isset($options['headers']) ? $options['headers'] : [];
+            $options['headers'] = array_merge($headers, ['Content-Type' => 'application/json']);
 
             if (empty($options['json'])) {
                 $options['body'] = \GuzzleHttp\json_encode($options['json'], JSON_FORCE_OBJECT);

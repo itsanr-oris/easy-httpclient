@@ -12,12 +12,12 @@ interface MiddlewareInterface
      *
      * @return string
      */
-    public function name() : string;
+    public function name();
 
     /**
      * Get middleware closure
      *
      * @return callable
      */
-    public function callable() : callable;
+    public function callback();
 }

@@ -1,10 +1,7 @@
-<?php
-/**
- * Created by PhpStorm.
- * User: f-oris
- * Date: 2019/8/21
- * Time: 6:20 PM
- */
+<?php /** @noinspection PhpDeprecationInspection */
+/** @noinspection PhpUndefinedClassInspection */
+/** @noinspection PhpParamsInspection */
+/** @noinspection PhpMethodParametersCountMismatchInspection */
 
 namespace Foris\Easy\HttpClient\Tests;
 
@@ -20,9 +17,6 @@ use Foris\Easy\HttpClient\Middleware\MiddlewareInterface;
 
 /**
  * Class HttpClientTest
- * @package EasySmartProgram\Tests\Support\Http
- * @author  f-oris <us@f-oris.me>
- * @version 1.0.0
  */
 class HttpClientTest extends TestCase
 {
@@ -155,33 +149,30 @@ class HttpClientTest extends TestCase
         $response = new Response();
         $guzzleClient = Mockery::mock(Client::class);
 
-        $guzzleClient->shouldReceive('request')->withArgs(
-            function ($method, $url, $options) {
-                if ($method != 'POST') {
-                    return false;
-                }
+        $guzzleClient->shouldReceive('request')
+            ->andReturn($response)
+            ->matchArgs([
+                'POST',
+                '/',
+                Mockery::on(function ($options) {
+                    $keys = ['curl', 'query', 'multipart', 'connect_timeout', 'timeout', 'read_timeout', 'handler'];
+                    if (!empty(array_diff($keys, array_keys($options)))) {
+                        return false;
+                    }
 
-                if ($url != '/') {
-                    return false;
-                }
+                    $upload = [];
+                    foreach ($options['multipart'] as $multipart) {
+                        $upload[] = $multipart['name'];
+                    }
 
-                $keys = ['curl', 'query', 'multipart', 'connect_timeout', 'timeout', 'read_timeout', 'handler'];
-                if (!empty(array_diff($keys, array_keys($options)))) {
-                    return false;
-                }
+                    if (!empty(array_diff(['file', 'form'], $upload))) {
+                        return false;
+                    }
 
-                $upload = [];
-                foreach ($options['multipart'] as $multipart) {
-                    $upload[] = $multipart['name'];
-                }
+                    return true;
+                })
+            ]);
 
-                if (!empty(array_diff(['file', 'form'], $upload))) {
-                    return false;
-                }
-
-                return true;
-            }
-        )->andReturn($response);
         $httpClient = (new HttpClient())->setGuzzleClient($guzzleClient)->setHandlerStack($handlerStack);
 
         $uri = '/';
@@ -203,7 +194,7 @@ class HttpClientTest extends TestCase
         $callable = function () {
             return 'This is a test middleware';
         };
-        $middleware->shouldReceive('callable')->andReturn($callable);
+        $middleware->shouldReceive('callback')->andReturn($callable);
 
         $httpClient = new HttpClient();
         $handlerStack = $httpClient->getHandlerStack();
@@ -228,7 +219,7 @@ class HttpClientTest extends TestCase
         $callable = function () {
             return 'This is a test middleware';
         };
-        $middleware->shouldReceive('callable')->andReturn($callable);
+        $middleware->shouldReceive('callback')->andReturn($callable);
 
         $httpClient = new HttpClient();
         $httpClient->pushMiddleware($middleware);

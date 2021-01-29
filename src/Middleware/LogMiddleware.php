@@ -39,7 +39,7 @@ class LogMiddleware implements MiddlewareInterface
      *
      * @return LoggerInterface
      */
-    protected function logger() : LoggerInterface
+    protected function logger()
     {
         return $this->logger;
     }
@@ -51,7 +51,7 @@ class LogMiddleware implements MiddlewareInterface
      */
     protected function format()
     {
-        return $this->config['log_template'] ?? MessageFormatter::DEBUG;
+        return isset($this->config['log_template']) ? $this->config['log_template'] : MessageFormatter::DEBUG;
     }
 
     /**
@@ -61,7 +61,7 @@ class LogMiddleware implements MiddlewareInterface
      */
     protected function level()
     {
-        return $this->config['log_level'] ?? LogLevel::INFO;
+        return isset($this->config['log_level']) ? $this->config['log_level'] : LogLevel::INFO;
     }
 
     /**
@@ -69,7 +69,7 @@ class LogMiddleware implements MiddlewareInterface
      *
      * @return string
      */
-    public function name() : string
+    public function name()
     {
         return 'log';
     }
@@ -79,7 +79,7 @@ class LogMiddleware implements MiddlewareInterface
      *
      * @return callable
      */
-    public function callable() : callable
+    public function callback()
     {
         return Middleware::log($this->logger(), new MessageFormatter($this->format()), $this->level());
     }

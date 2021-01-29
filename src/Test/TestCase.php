@@ -12,7 +12,7 @@ class TestCase extends \PHPUnit\Framework\TestCase
     /**
      * Tear down the test case.
      */
-    public function tearDown(): void
+    public function tearDown()
     {
         if (class_exists('Mockery')) {
             if ($container = Mockery::getContainer()) {

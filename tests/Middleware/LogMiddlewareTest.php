@@ -1,21 +1,18 @@
-<?php
-/**
- * Created by PhpStorm.
- * User: f-oris
- * Date: 2019/8/21
- * Time: 6:12 PM
- */
+<?php /** @noinspection PhpDeprecationInspection */
+/** @noinspection PhpUndefinedClassInspection */
 
 namespace Foris\Easy\HttpClient\Tests\Middleware;
 
 use GuzzleHttp\MessageFormatter;
-use function GuzzleHttp\Psr7\str;
 use Psr\Log\LogLevel;
 use Psr\Log\Test\TestLogger;
 use Foris\Easy\HttpClient\Middleware\LogMiddleware;
 use Foris\Easy\HttpClient\Middleware\MiddlewareInterface;
 use Foris\Easy\HttpClient\Test\HttpClientMiddlewareTestCase;
 
+/**
+ * Class LogMiddlewareTest
+ */
 class LogMiddlewareTest extends HttpClientMiddlewareTestCase
 {
     /**
@@ -36,7 +33,7 @@ class LogMiddlewareTest extends HttpClientMiddlewareTestCase
     /**
      * @return MiddlewareInterface
      */
-    public function middleware(): MiddlewareInterface
+    public function middleware()
     {
         $this->logger = new TestLogger();
         $this->formatter = MessageFormatter::DEBUG;
@@ -54,6 +51,6 @@ class LogMiddlewareTest extends HttpClientMiddlewareTestCase
 
         $this->assertCount(1, $this->logger->records);
         $this->assertSame($this->level, $this->logger->records[0]['level']);
-        $this->assertSame(str($response), $this->logger->records[0]['message']);
+        $this->assertSame(\GuzzleHttp\Psr7\str($response), $this->logger->records[0]['message']);
     }
 }

@@ -35,7 +35,7 @@ class RetryMiddleware implements MiddlewareInterface
      */
     protected function retries()
     {
-        return $this->config['max_retries'] ?? 1;
+        return isset($this->config['max_retries']) ? $this->config['max_retries'] : 1;
     }
 
     /**
@@ -46,7 +46,7 @@ class RetryMiddleware implements MiddlewareInterface
     protected function delay()
     {
         return function () {
-            return $this->config['retry_delay'] ?? 500;
+            return isset($this->config['retry_delay']) ? $this->config['retry_delay'] : 500;
         };
     }
 
@@ -85,7 +85,7 @@ class RetryMiddleware implements MiddlewareInterface
      *
      * @return string
      */
-    public function name(): string
+    public function name()
     {
         return 'retry';
     }
@@ -95,7 +95,7 @@ class RetryMiddleware implements MiddlewareInterface
      *
      * @return callable
      */
-    public function callable(): callable
+    public function callback()
     {
         return Middleware::retry($this->decider(), $this->delay());
     }

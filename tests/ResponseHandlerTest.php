@@ -1,10 +1,4 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: f-oris
- * Date: 2019/8/21
- * Time: 6:19 PM
- */
 
 namespace Foris\Easy\HttpClient\Tests;
 
@@ -15,9 +9,6 @@ use Foris\Easy\HttpClient\ResponseHandler;
 
 /**
  * Class ResponseHandlerTest
- * @package EasySmartProgram\Tests\Support\Http
- * @author  f-oris <us@f-oris.me>
- * @version 1.0.0
  */
 class ResponseHandlerTest extends TestCase
 {
