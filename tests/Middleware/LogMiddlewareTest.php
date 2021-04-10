@@ -1,59 +1,81 @@
-<?php
-/**
- * Created by PhpStorm.
- * User: f-oris
- * Date: 2019/8/21
- * Time: 6:12 PM
- */
+<?php /** @noinspection PhpDeprecationInspection */
+/** @noinspection PhpUndefinedClassInspection */
 
 namespace Foris\Easy\HttpClient\Tests\Middleware;
 
+use Foris\Easy\HttpClient\Middleware\LogMiddleware;
+use Foris\Easy\HttpClient\Tests\TestCase;
 use GuzzleHttp\MessageFormatter;
-use function GuzzleHttp\Psr7\str;
+use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 use Psr\Log\Test\TestLogger;
-use Foris\Easy\HttpClient\Middleware\LogMiddleware;
-use Foris\Easy\HttpClient\Middleware\MiddlewareInterface;
-use Foris\Easy\HttpClient\Test\HttpClientMiddlewareTestCase;
 
-class LogMiddlewareTest extends HttpClientMiddlewareTestCase
+/**
+ * Class LogMiddlewareTest
+ */
+class LogMiddlewareTest extends TestCase
 {
     /**
-     * @var TestLogger
+     * Gets the logger instance.
+     *
+     * @return LoggerInterface|TestLogger
      */
-    protected $logger;
-
-    /**
-     * @var string
-     */
-    protected $formatter;
-
-    /**
-     * @var string
-     */
-    protected $level;
-
-    /**
-     * @return MiddlewareInterface
-     */
-    public function middleware(): MiddlewareInterface
+    protected function logger()
     {
-        $this->logger = new TestLogger();
-        $this->formatter = MessageFormatter::DEBUG;
-        $this->level = LogLevel::DEBUG;
-
-        return new LogMiddleware($this->logger, ['log_template' => '{response}', 'log_level' => $this->level]);
+        return $this->httpClient()->getLogger();
     }
 
     /**
+     * Gets the log message record level.
+     *
+     * @return array|mixed|null
+     */
+    protected function level()
+    {
+        return $this->httpClient()->getConfig('log_level', LogLevel::INFO);
+    }
+
+    /**
+     * Gets the log message formatter.
+     *
+     * @return MessageFormatter
+     */
+    protected function formatter()
+    {
+        return new MessageFormatter($this->getConfig('log_template', MessageFormatter::DEBUG));
+    }
+
+    /**
+     * Test whether the component is not loaded.
+     */
+    public function testWhetherTheLogMiddlewareIsNotLoaded()
+    {
+        $this->assertFalse(strpos($this->httpClient()->getHandlerStack(), LogMiddleware::name()));
+    }
+
+    /**
+     * Test whether the component is loaded.
+     */
+    public function testWhetherTheLogMiddlewareIsLoaded()
+    {
+        $this->httpClient()->setLogger(new TestLogger());
+        $this->assertTrue(strpos($this->httpClient()->getHandlerStack(), LogMiddleware::name()) >= 0);
+    }
+
+    /**
+     * Test log http message.
+     *
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function testLogMiddleware()
+    public function testLogHttpRequestMessage()
     {
-        $response = $this->appendResponse()->client()->request('GET', '/');
+        $this->httpClient()->setLogger(new TestLogger());
 
-        $this->assertCount(1, $this->logger->records);
-        $this->assertSame($this->level, $this->logger->records[0]['level']);
-        $this->assertSame(str($response), $this->logger->records[0]['message']);
+        $this->mockResponse();
+        $response = $this->httpClient()->castResponse(false)->get('http://localhost/demo');
+
+        $this->assertCount(1, $this->logger()->records);
+        $this->assertSame($this->level(), $this->logger()->records[0]['level']);
+        $this->assertSame($this->formatter()->format($this->lastRequest(), $response), $this->logger()->records[0]['message']);
     }
 }
