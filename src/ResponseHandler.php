@@ -30,7 +30,7 @@ class ResponseHandler
             return $this->castXmlResponse($response);
         }
 
-        return $response->getBody();
+        return (string) $response->getBody();
     }
 
     /**
