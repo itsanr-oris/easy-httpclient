@@ -2,14 +2,9 @@
 
 return [
     /**
-     * request log template
+     * http request base uri.
      */
-    'log_template' => \GuzzleHttp\MessageFormatter::DEBUG,
-
-    /**
-     * log level
-     */
-    'log_level' => \Psr\Log\LogLevel::DEBUG,
+    'base_uri' => '',
 
     /**
      * max retry times
@@ -22,7 +17,12 @@ return [
     'retry_delay' => 500,
 
     /**
-     * set default response type
+     * log level
      */
-    'response_type' => \Foris\Easy\HttpClient\ResponseHandler::TYPE_COLLECTION,
+    'log_level' => \Psr\Log\LogLevel::DEBUG,
+
+    /**
+     * request log template
+     */
+    'log_template' => \GuzzleHttp\MessageFormatter::DEBUG,
 ];

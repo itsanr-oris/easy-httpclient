@@ -1,279 +1,128 @@
-<?php
-/**
- * Created by PhpStorm.
- * User: f-oris
- * Date: 2019/8/21
- * Time: 6:20 PM
- */
+<?php /** @noinspection PhpUndefinedClassInspection */
 
 namespace Foris\Easy\HttpClient\Tests;
 
-use Mockery;
 use GuzzleHttp\Client;
-use GuzzleHttp\ClientInterface;
-use GuzzleHttp\HandlerStack;
-use GuzzleHttp\Psr7\Response;
-use Foris\Easy\HttpClient\Test\TestCase;
-use Foris\Easy\HttpClient\HttpClient;
-use Foris\Easy\HttpClient\ResponseHandler;
-use Foris\Easy\HttpClient\Middleware\MiddlewareInterface;
 
 /**
  * Class HttpClientTest
- * @package EasySmartProgram\Tests\Support\Http
- * @author  f-oris <us@f-oris.me>
- * @version 1.0.0
  */
 class HttpClientTest extends TestCase
 {
     /**
-     * test get guzzle client
+     * Test gets the http client configurations.
      */
-    public function testGetGuzzleClient()
+    public function testGetConfig()
     {
-        $this->assertInstanceOf(ClientInterface::class, (new HttpClient())->getGuzzleClient());
-    }
-
-    /**
-     * @throws \GuzzleHttp\Exception\GuzzleException
-     */
-    public function testHttpGet()
-    {
-        $handlerStack = HandlerStack::create();
-        $response = new Response();
-        $guzzleClient = Mockery::mock(Client::class);
-
-        $options = [
-            'curl' => [
-                CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
-            ],
-            'query' => [
-                'key' => 'value'
-            ],
-            'handler' => $handlerStack,
+        $config = [
+            'key_1' => 'value_1',
+            'key_2' => 'value_2',
         ];
+        $this->httpClient()->setConfig($config);
 
-        $guzzleClient->shouldReceive('request')->withArgs(['GET', '/', $options])->andReturn($response);
-
-        $httpClient = (new HttpClient())->setGuzzleClient($guzzleClient)->setHandlerStack($handlerStack);
-
-        $this->assertSame($response, $httpClient->get('/', ['key' => 'value']));
+        $this->assertEquals($config, $this->httpClient()->getConfig());
+        $this->assertEquals('value_1', $this->httpClient()->getConfig('key_1'));
+        $this->assertNull($this->httpClient()->getConfig('key_3'));
+        $this->assertEquals('default_value', $this->httpClient()->getConfig('key_3', 'default_value'));
     }
 
     /**
+     * Test sets the real http client.
+     */
+    public function testSetGuzzleClient()
+    {
+        $client = new Client();
+        $this->assertSame($client, $this->httpClient()->setGuzzleClient($client)->getGuzzleClient());
+    }
+
+    /**
+     * Test sending request with curl options.
+     *
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function testHttpPost()
+    public function testAssertRequestWithCurlOptions()
     {
-        $handlerStack = HandlerStack::create();
-        $response = new Response();
-        $guzzleClient = Mockery::mock(Client::class);
+        $this->mockResponse();
+        $this->httpClient()->request('http://localhost/demo');
 
-        $options = [
-            'curl' => [
-                CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
-            ],
-            'form_params' => [
-                'key' => 'value'
-            ],
-            'handler' => $handlerStack,
+        $lastOptions = $this->lastRequestOptions();
+        $this->assertEquals([CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4], $lastOptions['curl']);
+    }
+
+    /**
+     * Test sending a 'GET' request.
+     *
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function testAssertGetRequestWasSent()
+    {
+        $this->mockResponse();
+        $this->httpClient()->get('http://localhost/demo', ['key_1' => 'value_1']);
+        $this->assertGetRequestWasSent('http://localhost/demo', ['key_1' => 'value_1']);
+    }
+
+    /**
+     * Test sending a 'POST' request.
+     *
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function testAssertPostRequestWasSent()
+    {
+        $this->mockResponse();
+        $this->httpClient()->post('http://localhost/demo', ['key' => 'value']);
+        $this->assertPostRequestWasSent('http://localhost/demo', ['key' => 'value']);
+    }
+
+    /**
+     * Test sending a 'POST json' request.
+     *
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function testAssertPostJsonRequestWasSent()
+    {
+        $this->mockResponse();
+        $this->httpClient()->postJson('http://localhost/demo', ['key' => 'value']);
+        $this->assertPostJsonRequestWasSent('http://localhost/demo', ['key' => 'value']);
+    }
+
+    /**
+     * Test sending a file upload request.
+     *
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function testAssertUploadRequestWasSent()
+    {
+        $this->mockResponse();
+
+        $files = [
+            'file_1' => __DIR__ . '/HttpClientTest.php',
+            'file_2' => 'file_2 content.'
         ];
-
-        $guzzleClient->shouldReceive('request')->withArgs(['POST', '/', $options])->andReturn($response);
-
-        $httpClient = (new HttpClient())->setGuzzleClient($guzzleClient)->setHandlerStack($handlerStack);
-
-        $this->assertSame($response, $httpClient->post('/', ['key' => 'value']));
+        $this->httpClient()->upload('http://localhost/demo', $files);
+        $this->assertUploadRequestWasSent('http://localhost/demo', $files);
     }
 
     /**
+     * Test sending request with header params.
+     *
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function testHttpPostJson()
+    public function testAssertRequestWithHeaderParams()
     {
-        $handlerStack = HandlerStack::create();
-        $response = new Response();
-        $guzzleClient = Mockery::mock(Client::class);
-
-        $options = [
-            'curl' => [
-                CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
-            ],
-            'query' => [
-                'key' => 'value'
-            ],
-            'handler' => $handlerStack,
-            'headers' => [
-                'Content-Type' => 'application/json'
-            ],
-            'body' => \GuzzleHttp\json_encode(['data_key' => 'data_value'], JSON_UNESCAPED_UNICODE)
-        ];
-
-        $guzzleClient->shouldReceive('request')->withArgs(['POST', '/', $options])->andReturn($response);
-
-        $httpClient = (new HttpClient())->setGuzzleClient($guzzleClient)->setHandlerStack($handlerStack);
-
-        $this->assertSame($response, $httpClient->postJson('/', ['data_key' => 'data_value'], ['key' => 'value']));
+        $this->mockResponse();
+        $this->httpClient()->request('http://localhost/demo', 'PUT', ['headers' => ['X-Token' => 'token']]);
+        $this->assertRequestWasSent('http://localhost/demo', 'PUT', ['headers' => ['X-Token' => 'token']]);
     }
 
     /**
+     * Test sending request with body params.
+     *
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function testHttpPostEmptyJson()
+    public function testAssertRequestWithBodyParams()
     {
-        $handlerStack = HandlerStack::create();
-        $response = new Response();
-        $guzzleClient = Mockery::mock(Client::class);
-
-        $options = [
-            'curl' => [
-                CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
-            ],
-            'query' => [
-                'key' => 'value'
-            ],
-            'handler' => $handlerStack,
-            'headers' => [
-                'Content-Type' => 'application/json'
-            ],
-            'body' => \GuzzleHttp\json_encode([], JSON_FORCE_OBJECT)
-        ];
-
-        $guzzleClient->shouldReceive('request')->withArgs(['POST', '/', $options])->andReturn($response);
-
-        $httpClient = (new HttpClient())->setGuzzleClient($guzzleClient)->setHandlerStack($handlerStack);
-
-        $this->assertSame($response, $httpClient->postJson('/', [], ['key' => 'value']));
-    }
-
-    /**
-     * @throws \GuzzleHttp\Exception\GuzzleException
-     */
-    public function testHttpUpload()
-    {
-        $handlerStack = HandlerStack::create();
-        $response = new Response();
-        $guzzleClient = Mockery::mock(Client::class);
-
-        $guzzleClient->shouldReceive('request')->withArgs(
-            function ($method, $url, $options) {
-                if ($method != 'POST') {
-                    return false;
-                }
-
-                if ($url != '/') {
-                    return false;
-                }
-
-                $keys = ['curl', 'query', 'multipart', 'connect_timeout', 'timeout', 'read_timeout', 'handler'];
-                if (!empty(array_diff($keys, array_keys($options)))) {
-                    return false;
-                }
-
-                $upload = [];
-                foreach ($options['multipart'] as $multipart) {
-                    $upload[] = $multipart['name'];
-                }
-
-                if (!empty(array_diff(['file', 'form'], $upload))) {
-                    return false;
-                }
-
-                return true;
-            }
-        )->andReturn($response);
-        $httpClient = (new HttpClient())->setGuzzleClient($guzzleClient)->setHandlerStack($handlerStack);
-
-        $uri = '/';
-        $files = ['file' => __DIR__ . '/HttpClientTest.php'];
-        $form = ['form' => 'form upload data'];
-        $query = ['key' => 'value'];
-
-        $this->assertEquals($response, $httpClient->upload($uri, $files, $form, $query));
-    }
-
-    /**
-     * Push guzzle client middleware before handler stack create
-     */
-    public function testPushGuzzleClientMiddlewareBeforeHandlerStackCreate()
-    {
-        $middleware = Mockery::mock(MiddlewareInterface::class);
-        $middleware->shouldReceive('name')->andReturn('test-middleware');
-
-        $callable = function () {
-            return 'This is a test middleware';
-        };
-        $middleware->shouldReceive('callable')->andReturn($callable);
-
-        $httpClient = new HttpClient();
-        $handlerStack = $httpClient->getHandlerStack();
-        $expectHandlerStack = HandlerStack::create();
-        $expectHandlerStack->push($callable, 'test-middleware');
-        $this->assertNotEquals($expectHandlerStack, $handlerStack);
-
-        $httpClient->pushMiddleware($middleware);
-        $this->assertEquals($expectHandlerStack, $handlerStack);
-
-        return $httpClient;
-    }
-
-    /**
-     * Push guzzle client middleware after handler stack create
-     */
-    public function testPushGuzzleClientMiddlewareAfterHandlerStackCreate()
-    {
-        $middleware = Mockery::mock(MiddlewareInterface::class);
-        $middleware->shouldReceive('name')->andReturn('test-middleware');
-
-        $callable = function () {
-            return 'This is a test middleware';
-        };
-        $middleware->shouldReceive('callable')->andReturn($callable);
-
-        $httpClient = new HttpClient();
-        $httpClient->pushMiddleware($middleware);
-        $handlerStack = $httpClient->getHandlerStack();
-
-        $expectHandlerStack = HandlerStack::create();
-        $expectHandlerStack->push($callable, 'test-middleware');
-
-        $this->assertEquals($expectHandlerStack, $handlerStack);
-
-        return $httpClient;
-    }
-
-    /**
-     * @param HttpClient $httpClient
-     * @depends testPushGuzzleClientMiddlewareBeforeHandlerStackCreate
-     */
-    public function testRemoveGuzzleClientMiddleware(HttpClient $httpClient)
-    {
-        $httpClient->removeMiddleware('test-middleware');
-        $this->assertEquals(HandlerStack::create(), $httpClient->getHandlerStack());
-    }
-
-    /**
-     * test set response handler
-     */
-    public function testSetResponseHandler()
-    {
-        $httpClient = new HttpClient();
-        $responseHandler = Mockery::mock(ResponseHandler::class);
-        $this->assertSame($responseHandler, $httpClient->setResponseHandler($responseHandler)->getResponseHandler());
-    }
-
-    /**
-     * test set response type
-     */
-    public function testSetResponseType()
-    {
-        $httpClient = new HttpClient();
-
-        $this->assertSame(ResponseHandler::TYPE_GUZZLE_RESPONSE, $httpClient->getResponseType());
-
-        $this->assertSame(
-            ResponseHandler::TYPE_COLLECTION,
-            $httpClient->setResponseType(ResponseHandler::TYPE_COLLECTION)->getResponseType()
-        );
+        $this->mockResponse();
+        $this->httpClient()->request('http://localhost/demo', 'PUT', ['body' => 'test body content']);
+        $this->assertRequestWasSent('http://localhost/demo', 'PUT', ['body' => 'test body content']);
     }
 }

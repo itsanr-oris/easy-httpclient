@@ -3,50 +3,90 @@
 namespace Foris\Easy\HttpClient;
 
 use GuzzleHttp\Psr7\Response;
-use Foris\Easy\Support\Collection;
 
 /**
  * Class ResponseCast
  */
 class ResponseHandler
 {
-    const TYPE_ARRAY = 'array';
-    const TYPE_COLLECTION = 'collection';
-    const TYPE_GUZZLE_RESPONSE = 'guzzle';
-
     /**
      * Cast response message to specified type
      *
      * @param Response $response
-     * @param string   $type
+     * @param array    $options
      * @return mixed
      */
-    public function castResponse(Response $response, $type = self::TYPE_COLLECTION)
+    public function castResponse(Response $response, $options = [])
     {
-        if ($type == self::TYPE_ARRAY) {
-            return $this->castResponseToArray($response);
+        if (!$this->enable($options)) {
+            return $response;
         }
 
-        if ($type == self::TYPE_COLLECTION) {
-            $items = $this->castResponseToArray($response);
-            return is_array($items) ? new Collection($items) : $items;
+        if ($this->isJsonResponse($response)) {
+            return $this->castJsonResponse($response);
         }
 
-        return $response;
-    }
-
-    /**
-     * Cast response message to array
-     *
-     * @param Response $response
-     * @return array|mixed
-     */
-    protected function castResponseToArray(Response $response)
-    {
-        if (false !== strpos($response->getHeaderLine('Content-Type'), 'application/json')) {
-            return json_decode($response->getBody(), true);
+        if ($this->isXmlResponse($response)) {
+            return $this->castXmlResponse($response);
         }
 
         return $response->getBody();
+    }
+
+    /**
+     * Determine whether to enable the response conversion logic.
+     *
+     * @param $options
+     * @return bool
+     */
+    protected function enable($options)
+    {
+        return isset($options['cast_response']) && $options['cast_response'];
+    }
+
+    /**
+     * Determine whether current response is a json response.
+     *
+     * @param Response $response
+     * @return bool
+     */
+    protected function isJsonResponse(Response $response)
+    {
+        return false !== strpos($response->getHeaderLine('Content-Type'), 'application/json');
+    }
+
+    /**
+     * Cast json response to array.
+     *
+     * @param Response $response
+     * @return mixed
+     */
+    protected function castJsonResponse(Response $response)
+    {
+        return json_decode($response->getBody(), true);
+    }
+
+    /**
+     * Determine whether current response is a xml response.
+     *
+     * @param Response $response
+     * @return bool
+     */
+    protected function isXmlResponse(Response $response)
+    {
+        $line = $response->getHeaderLine('Content-Type');
+        return false !== strpos($line, 'text/xml') || false !== strpos($line, 'application/xml');
+    }
+
+    /**
+     * Cast xml response to array.
+     *
+     * @param Response $response
+     * @return mixed
+     */
+    protected function castXmlResponse(Response $response)
+    {
+        $xml = simplexml_load_string($response->getBody(),'SimpleXMLElement',LIBXML_NOCDATA);
+        return json_decode(json_encode($xml), true);
     }
 }

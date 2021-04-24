@@ -3,84 +3,69 @@
 namespace Foris\Easy\HttpClient\Middleware;
 
 use GuzzleHttp\MessageFormatter;
-use GuzzleHttp\Middleware;
+use GuzzleHttp\Middleware as GuzzleMiddleware;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 
 /**
  * Class LogMiddleware
  */
-class LogMiddleware implements MiddlewareInterface
+class LogMiddleware extends Middleware
 {
     /**
-     * @var LoggerInterface
-     */
-    protected $logger;
-
-    /**
-     * @var array
-     */
-    protected $config = [];
-
-    /**
-     * LogMiddleware constructor.
+     * The middleware executed before current.
      *
-     * @param LoggerInterface|null $logger
-     * @param array                $config
+     * @var bool
      */
-    public function __construct(LoggerInterface $logger, array $config = [])
-    {
-        $this->logger = $logger;
-        $this->config = $config;
-    }
+    protected $after = RetryMiddleware::class;
 
     /**
-     * Get logger instance
+     * Gets the logger instance
      *
      * @return LoggerInterface
      */
-    protected function logger() : LoggerInterface
+    protected function logger()
     {
-        return $this->logger;
+        return $this->httpClient()->getLogger();
     }
 
     /**
-     * Get log message format template
+     * Gets the log message template.
      *
      * @return mixed|string
      */
     protected function format()
     {
-        return $this->config['log_template'] ?? MessageFormatter::DEBUG;
+        return $this->getConfig('log_template', MessageFormatter::DEBUG);
     }
 
     /**
-     * Get logger message record level
+     * Gets the log message record level
      *
      * @return mixed|string
      */
     protected function level()
     {
-        return $this->config['log_level'] ?? LogLevel::INFO;
+        return $this->getConfig('log_level', LogLevel::INFO);
     }
 
     /**
-     * Get middleware name
-     *
-     * @return string
-     */
-    public function name() : string
-    {
-        return 'log';
-    }
-
-    /**
-     * Get middleware closure
+     * Gets the middleware handler.
      *
      * @return callable
      */
-    public function callable() : callable
+    public function callback()
     {
-        return Middleware::log($this->logger(), new MessageFormatter($this->format()), $this->level());
+        return GuzzleMiddleware::log($this->logger(), new MessageFormatter($this->format()), $this->level());
+    }
+
+    /**
+     * Register current middleware.
+     */
+    public function register()
+    {
+        if ($this->logger() instanceof LoggerInterface) {
+            parent::register();
+        }
     }
 }

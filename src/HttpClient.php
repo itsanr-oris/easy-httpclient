@@ -1,11 +1,17 @@
-<?php
+<?php /** @noinspection PhpDeprecationInspection */
+/** @noinspection PhpParamsInspection */
+/** @noinspection PhpUndefinedClassInspection */
 
 namespace Foris\Easy\HttpClient;
 
+use Foris\Easy\HttpClient\Middleware\FixJsonOptionsMiddleware;
+use Foris\Easy\HttpClient\Middleware\LogMiddleware;
+use Foris\Easy\HttpClient\Middleware\Middleware;
+use Foris\Easy\HttpClient\Middleware\RetryMiddleware;
 use GuzzleHttp\Client;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\HandlerStack;
-use Foris\Easy\HttpClient\Middleware\MiddlewareInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * Class HttpClient
@@ -13,193 +19,171 @@ use Foris\Easy\HttpClient\Middleware\MiddlewareInterface;
 class HttpClient
 {
     /**
+     * Guzzle http client instance.
+     *
      * @var ClientInterface
      */
     protected $client;
 
     /**
-     * @var HandlerStack
-     */
-    protected $handlerStack;
-
-    /**
-     * @var array
-     */
-    protected $middleware = [];
-
-    /**
-     * @var
-     */
-    protected $baseUri;
-
-    /**
+     * Http-client configuration.
+     *
      * @var array
      */
     protected $config = [];
 
     /**
+     * Psr\Logger instance.
+     *
+     * @var LoggerInterface
+     */
+    protected $logger = null;
+
+    /**
+     * Guzzle middleware stack.
+     *
+     * @var HandlerStack
+     */
+    protected $handlerStack;
+
+    /**
+     * Indicates if the http client has "booted".
+     *
+     * @var bool
+     */
+    protected $booted = false;
+
+    /**
+     * ResponseHandler instance.
+     *
      * @var ResponseHandler
      */
     protected $responseHandler;
 
     /**
-     * @var mixed
-     */
-    protected $responseType;
-
-    /**
-     * @var string
-     */
-    protected $defaultResponseType = ResponseHandler::TYPE_GUZZLE_RESPONSE;
-
-    /**
+     * Http client middleware array.
+     *
      * @var array
      */
-    protected static $defaults = [
+    protected $middleware = [
+        RetryMiddleware::class,
+        FixJsonOptionsMiddleware::class,
+        // other middleware...
+    ];
+
+    /**
+     * Guzzle http-client request options.
+     *
+     * @var array
+     */
+    protected $defaults = [
+        'cast_response' => true,
         'curl' => [
             CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
         ],
     ];
 
     /**
+     * Current request options.
+     *
+     * @var array
+     */
+    protected $options = [];
+
+    /**
      * HttpClient constructor.
      *
-     * @param array           $config
+     * @param array $config
      */
-    public function __construct(array $config = [])
+    public function __construct($config = [])
     {
-        $this->setConfig($config);
-        $this->setResponseType($config['response_type'] ?? $this->defaultResponseType);
+        $this->setConfig($config)->boot();
     }
 
     /**
-     * Set http-client config
+     * Boot the http-client components.
+     */
+    protected function boot()
+    {
+        $this->bootMiddleware();
+        $this->booted = true;
+    }
+
+    /**
+     * Boot the http-client middleware.
+     */
+    protected function bootMiddleware()
+    {
+        foreach ($this->middleware as $class) {
+            if (class_exists($class) && is_subclass_of($class, Middleware::class)) {
+                $this->registerMiddleware($class);
+            }
+        }
+    }
+
+    /**
+     * Sets the http client configuration.
      *
      * @param array $config
      * @return $this
      */
-    public function setConfig(array $config = [])
+    public function setConfig($config = [])
     {
         $this->config = $config;
         return $this;
     }
 
     /**
-     * Set response handler
+     * Gets the http client configuration.
      *
-     * @param ResponseHandler $handler
+     * @param null $key
+     * @param null $default
+     * @return array|mixed|null
+     */
+    public function getConfig($key = null, $default = null)
+    {
+        if ($key === null) {
+            return $this->config;
+        }
+
+        return isset($this->config[$key]) ? $this->config[$key] : $default;
+    }
+
+    /**
+     * Sets the psr logger instance.
+     *
+     * @param LoggerInterface $logger
      * @return $this
      */
-    public function setResponseHandler(ResponseHandler $handler)
+    public function setLogger(LoggerInterface $logger)
     {
-        $this->responseHandler = $handler;
+        $this->logger = $logger;
+        return $this->registerLogMiddleware();
+    }
+
+    /**
+     * Gets the psr logger instance.
+     *
+     * @return LoggerInterface
+     */
+    public function getLogger()
+    {
+        return $this->logger;
+    }
+
+    /**
+     * Register log middleware.
+     *
+     * @return $this
+     */
+    protected function registerLogMiddleware()
+    {
+        (new LogMiddleware($this))->register();
         return $this;
     }
 
     /**
-     * Get response handler instance
-     *
-     * @return ResponseHandler
-     */
-    public function getResponseHandler()
-    {
-        if (!$this->responseHandler instanceof ResponseHandler) {
-            $this->responseHandler = new ResponseHandler();
-        }
-        return $this->responseHandler;
-    }
-
-    /**
-     * Set response message return type
-     *
-     * @param string $type
-     * @return $this
-     */
-    public function setResponseType($type = ResponseHandler::TYPE_COLLECTION)
-    {
-        $this->responseType = $type;
-        return $this;
-    }
-
-    /**
-     * Get response message return type
-     *
-     * @return mixed
-     */
-    public function getResponseType()
-    {
-        // reset to default response type
-        $type = $this->responseType;
-        $this->setResponseType($this->config['response_type'] ?? $this->defaultResponseType);
-        return $type;
-    }
-
-    /**
-     * Push middleware
-     *
-     * @param MiddlewareInterface $middleware
-     * @return $this
-     */
-    public function pushMiddleware(MiddlewareInterface $middleware)
-    {
-        $this->middleware[$middleware->name()] = $middleware->callable();
-        if ($this->handlerStack instanceof HandlerStack) {
-            $this->handlerStack->push($middleware->callable(), $middleware->name());
-        }
-        return $this;
-    }
-
-    /**
-     * Remove middleware
-     *
-     * @param string $name
-     * @return $this
-     */
-    public function removeMiddleware(string $name)
-    {
-        unset($this->middleware[$name]);
-        if ($this->handlerStack instanceof HandlerStack) {
-            $this->handlerStack->remove($name);
-        }
-        return $this;
-    }
-
-    /**
-     * Set handler-stack instance
-     *
-     * @param \GuzzleHttp\HandlerStack $handlerStack
-     *
-     * @return $this
-     */
-    public function setHandlerStack(HandlerStack $handlerStack)
-    {
-        $this->handlerStack = $handlerStack;
-
-        return $this;
-    }
-
-    /**
-     * Get a handler stack instance
-     *
-     * @return \GuzzleHttp\HandlerStack
-     */
-    public function getHandlerStack(): HandlerStack
-    {
-        if ($this->handlerStack) {
-            return $this->handlerStack;
-        }
-
-        $this->handlerStack = HandlerStack::create();
-
-        foreach ($this->middleware as $name => $middleware) {
-            $this->handlerStack->push($middleware, $name);
-        }
-
-        return $this->handlerStack;
-    }
-
-    /**
-     * Set guzzle-client instance
+     * Sets the guzzle client instance
      *
      * @param ClientInterface $client
      * @return $this
@@ -211,7 +195,7 @@ class HttpClient
     }
 
     /**
-     * Get guzzle-client instance
+     * Gets the guzzle client instance
      *
      * @return Client|ClientInterface
      */
@@ -224,13 +208,137 @@ class HttpClient
     }
 
     /**
-     * Get http-client instance
+     * Gets the http client instance
      *
      * @return Client|ClientInterface
      */
     public function client()
     {
         return $this->getGuzzleClient();
+    }
+
+    /**
+     * Sets the handler stack instance
+     *
+     * @param \GuzzleHttp\HandlerStack $handlerStack
+     *
+     * @return $this
+     */
+    public function setHandlerStack(HandlerStack $handlerStack)
+    {
+        $this->handlerStack = $handlerStack;
+        return $this;
+    }
+
+    /**
+     * Gets the handler stack instance
+     *
+     * @return \GuzzleHttp\HandlerStack
+     */
+    public function getHandlerStack()
+    {
+        if (!$this->handlerStack instanceof HandlerStack) {
+            $this->handlerStack = HandlerStack::create();
+        }
+
+        return $this->handlerStack;
+    }
+
+    /**
+     * Put the middleware on the top of the stack.
+     *
+     * @param callable $middleware
+     * @param string   $name
+     * @return $this
+     */
+    public function middlewareOnTop(callable $middleware, $name = '')
+    {
+        $this->getHandlerStack()->unshift($middleware, $name);
+        return $this;
+    }
+
+    /**
+     * Put the middleware on the bottom of the stack.
+     *
+     * @param callable $middleware
+     * @param string   $name
+     * @return $this
+     */
+    public function middlewareOnBottom(callable $middleware, $name = '')
+    {
+        $this->getHandlerStack()->push($middleware, $name);
+        return $this;
+    }
+
+    /**
+     * Put the middleware before the name given.
+     *
+     * @param          $before
+     * @param callable $middleware
+     * @param string   $name
+     * @return $this
+     */
+    public function middlewareBefore($before, callable $middleware, $name = '')
+    {
+        $this->getHandlerStack()->before($before, $middleware, $name);
+        return $this;
+    }
+
+    /**
+     * Put the middleware after the name given.
+     *
+     * @param          $after
+     * @param callable $middleware
+     * @param string   $name
+     * @return $this
+     */
+    public function middlewareAfter($after, callable $middleware, $name = '')
+    {
+        $this->getHandlerStack()->after($after, $middleware, $name);
+        return $this;
+    }
+
+    /**
+     * Register middleware.
+     *
+     * @param        $middleware
+     * @param string $name
+     * @return $this|HttpClient
+     */
+    public function registerMiddleware($middleware, $name = '')
+    {
+        if (is_string($middleware) && class_exists($middleware) && is_subclass_of($middleware, Middleware::class)) {
+            call_user_func_array([new $middleware($this), 'register'], []);
+            return $this;
+        }
+
+        return $this->middlewareOnBottom($middleware, $name);
+    }
+
+    /**
+     * Remove middleware.
+     *
+     * @param $middleware
+     * @return $this
+     */
+    public function removeMiddleware($middleware)
+    {
+        $middleware = is_string($middleware) ? Middleware::resolveName($middleware) : $middleware;
+        $this->getHandlerStack()->remove($middleware);
+        return $this;
+    }
+
+    /**
+     * Gets the response handler instance.
+     *
+     * @return ResponseHandler
+     */
+    protected function responseHandler()
+    {
+        if (!$this->responseHandler instanceof ResponseHandler) {
+            $this->responseHandler = new ResponseHandler();
+        }
+        return $this->responseHandler;
     }
 
     /**
@@ -242,11 +350,8 @@ class HttpClient
      * @return mixed
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function get(
-        string $url,
-        array $query = [],
-        array $options = []
-    ) {
+    public function get($url, $query = [], $options = [])
+    {
         return $this->request($url,'GET', array_merge($options, ['query' => $query]));
     }
 
@@ -259,11 +364,8 @@ class HttpClient
      * @return mixed
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function post(
-        string $url,
-        array $data = [],
-        array $options = []
-    ) {
+    public function post($url, $data = [], $options = [])
+    {
         return $this->request($url, 'POST', array_merge($options, ['form_params' => $data]));
     }
 
@@ -272,18 +374,13 @@ class HttpClient
      *
      * @param string $url
      * @param array  $data
-     * @param array  $query
      * @param array  $options
      * @return mixed
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function postJson(
-        string $url,
-        array $data = [],
-        array $query = [],
-        array $options = []
-    ) {
-        return $this->request($url, 'POST', array_merge($options, ['query' => $query, 'json' => $data]));
+    public function postJson($url, $data = [], $options = [])
+    {
+        return $this->request($url, 'POST', array_merge($options, ['json' => $data]));
     }
 
     /**
@@ -291,35 +388,59 @@ class HttpClient
      *
      * @param string $url
      * @param array  $files
-     * @param array  $form
-     * @param array  $query
      * @param array  $options
      * @return mixed
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function upload(
-        string $url,
-        array $files = [],
-        array $form = [],
-        array $query = [],
-        array $options = []
-    ) {
+    public function upload($url, $files = [], $options = [])
+    {
         $multipart = [];
 
         foreach ($files as $name => $path) {
             $multipart[] = [
                 'name' => $name,
-                'contents' => fopen($path, 'r'),
+                'contents' => file_exists($path) ? fopen($path, 'r') : $path,
             ];
         }
 
-        foreach ($form as $name => $contents) {
-            $multipart[] = compact('name', 'contents');
-        }
-
         return $this->request($url, 'POST', array_merge($options, [
-            'query' => $query, 'multipart' => $multipart, 'connect_timeout' => 30, 'timeout' => 30, 'read_timeout' => 30
+            'multipart' => $multipart, 'connect_timeout' => 30, 'timeout' => 30, 'read_timeout' => 30
         ]));
+    }
+
+    /**
+     * Determine weather to handle http errors.
+     *
+     * @param bool $flag
+     * @return $this
+     */
+    public function httpErrors($flag = true)
+    {
+        $this->options['http_errors'] = $flag;
+        return $this;
+    }
+
+    /**
+     * Determine weather to cast http response.
+     *
+     * @param bool $flag
+     * @return $this
+     */
+    public function castResponse($flag = true)
+    {
+        $this->options['cast_response'] = $flag;
+        return $this;
+    }
+
+    /**
+     * Reset http request options.
+     *
+     * @return $this
+     */
+    protected function resetOptions()
+    {
+        $this->options = [];
+        return $this;
     }
 
     /**
@@ -331,36 +452,20 @@ class HttpClient
      * @return mixed
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function request(string $url, $method = 'GET', $options = [])
+    public function request($url, $method = 'GET', $options = [])
     {
-        $method = strtoupper($method);
+        $options = array_merge(
+            $this->defaults,
+            $this->options,
+            $options,
+            ['handler' => $this->getHandlerStack()]
+        );
+        $this->resetOptions();
 
-        $options = array_merge(self::$defaults, $options, ['handler' => $this->getHandlerStack()]);
-
-        $options = $this->fixJsonIssue($options);
-
-        return $this->getResponseHandler()->castResponse($this->client()->request($method, $url, $options), $this->getResponseType());
-    }
-
-    /**
-     * @param array $options
-     *
-     * @return array
-     */
-    protected function fixJsonIssue(array $options): array
-    {
-        if (isset($options['json']) && is_array($options['json'])) {
-            $options['headers'] = array_merge($options['headers'] ?? [], ['Content-Type' => 'application/json']);
-
-            if (empty($options['json'])) {
-                $options['body'] = \GuzzleHttp\json_encode($options['json'], JSON_FORCE_OBJECT);
-            } else {
-                $options['body'] = \GuzzleHttp\json_encode($options['json'], JSON_UNESCAPED_UNICODE);
-            }
-
-            unset($options['json']);
+        if (isset($options['json'])) {
+            $options['fix_json'] = $options['json'];
         }
 
-        return $options;
+        return $this->responseHandler()->castResponse($this->client()->request(strtoupper($method), $url, $options), $options);
     }
 }

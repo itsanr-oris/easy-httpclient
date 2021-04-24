@@ -2,7 +2,7 @@
 
 namespace Foris\Easy\HttpClient\Middleware;
 
-use GuzzleHttp\Middleware;
+use GuzzleHttp\Middleware as GuzzleMiddleware;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Exception\ServerException;
@@ -11,92 +11,55 @@ use GuzzleHttp\Exception\ConnectException;
 /**
  * Class RetryMiddleware
  */
-class RetryMiddleware implements MiddlewareInterface
+class RetryMiddleware extends Middleware
 {
     /**
-     * @var array
-     */
-    protected $config = [];
-
-    /**
-     * RetryMiddleware constructor.
+     * Gets the middleware handler
      *
-     * @param array $config
+     * @return callable
      */
-    public function __construct(array $config = [])
+    public function callback()
     {
-        $this->config = $config;
+        return GuzzleMiddleware::retry($this->decider(), $this->delay());
     }
 
     /**
-     * Get http request failure retry times
+     * Gets the retry times after http request failure.
      *
      * @return int|mixed
      */
     protected function retries()
     {
-        return $this->config['max_retries'] ?? 1;
+        return $this->getConfig('max_retries',1);
     }
 
     /**
-     * Get http request failure retry delay
+     * Gets the retry delay milliseconds after http request failure.
      *
      * @return int|mixed
      */
     protected function delay()
     {
         return function () {
-            return $this->config['retry_delay'] ?? 500;
+            return $this->getConfig('retry_delay', 500);
         };
     }
 
     /**
-     * Get http request failure retry decider
+     * Gets the retry decider after http request failure.
      *
      * @return \Closure
      */
     protected function decider()
     {
-        return function (
-            $retries,
-            Request $request,
-            Response $response = null,
-            $exception = null
-        ) {
+        return function ($retries, Request $request, Response $response = null, $exception = null) {
             if ($retries >= $this->retries()) {
                 return false;
             }
 
-            if ($exception instanceof ConnectException
-                || $exception instanceof ServerException) {
-                return true;
-            }
-
-            if ($response && $response->getStatusCode() >= 500) {
-                return true;
-            }
-
-            return false;
+            return $exception instanceof ConnectException
+                || $exception instanceof ServerException
+                || ($response && $response->getStatusCode() >= 500);
         };
-    }
-
-    /**
-     * Get middleware name
-     *
-     * @return string
-     */
-    public function name(): string
-    {
-        return 'retry';
-    }
-
-    /**
-     * Get middleware closure
-     *
-     * @return callable
-     */
-    public function callable(): callable
-    {
-        return Middleware::retry($this->decider(), $this->delay());
     }
 }

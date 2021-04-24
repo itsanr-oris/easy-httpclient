@@ -1,96 +1,77 @@
-<?php
-/**
- * Created by PhpStorm.
- * User: f-oris
- * Date: 2019/8/21
- * Time: 6:18 PM
- */
+<?php /** @noinspection PhpUndefinedClassInspection */
 
 namespace Foris\Easy\HttpClient\Tests\Middleware;
 
-use GuzzleHttp\Psr7\Request;
+use Foris\Easy\HttpClient\Tests\TestCase;
 use GuzzleHttp\Exception\ConnectException;
-use Foris\Easy\HttpClient\Middleware\RetryMiddleware;
-use Foris\Easy\HttpClient\Middleware\MiddlewareInterface;
-use Foris\Easy\HttpClient\Test\HttpClientMiddlewareTestCase;
+use GuzzleHttp\Exception\ServerException;
+use GuzzleHttp\Psr7\Request;
 
 /**
  * Class RetryMiddlewareTest
- * @package EasySmartProgram\Tests\Support\Http\Middleware
- * @author  f-oris <us@f-oris.me>
- * @version 1.0.0
  */
-class RetryMiddlewareTest extends HttpClientMiddlewareTestCase
+class RetryMiddlewareTest extends TestCase
 {
     /**
-     * @var int
+     * When a connection error occurs, try to resend the request.
+     *
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    protected $maxRetries;
-
-    /**
-     * @var int
-     */
-    protected $retryDelay;
-
-    /**
-     * @return MiddlewareInterface
-     */
-    public function middleware(): MiddlewareInterface
+    public function testRetryWithConnectionException()
     {
-        $this->maxRetries = 1;
-        $this->retryDelay = 100;
-        return new RetryMiddleware(['max_retries' => $this->maxRetries, 'retry_delay' => $this->retryDelay]);
+        $this->mockHttpException(
+            new ConnectException('Connection exception', new Request('GET', 'http://localhost/demo'))
+        );
+
+        $this->mockResponse(['data' => 'Right response.']);
+        $response = $this->httpClient()->get('http://localhost/demo');
+        $this->assertCount(2, $this->historyRequest());
+        $this->assertEquals('Right response.', $response['data']);
     }
 
     /**
+     * When a server error occurs, try to resend the request.
+     *
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function testSuccessRequest()
+    public function testRetryWithServerException()
     {
-        $this->appendResponse();
-        $response = $this->client()->request('GET', '/');
-        $this->assertSame(200, $response->getStatusCode());
+        $this->mockHttpException(
+            new ServerException('Server exception', new Request('GET', 'http://localhost/demo'))
+        );
+
+        $this->mockResponse(['data' => 'Right response.']);
+        $response = $this->httpClient()->get('http://localhost/demo');
+        $this->assertCount(2, $this->historyRequest());
+        $this->assertEquals('Right response.', $response['data']);
     }
 
     /**
+     * When response with 50x status code, try to resend the request.
+     *
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function testRetryServerException()
+    public function testRetryWith50xHttpCode()
     {
-        $this->appendResponse(500)->appendResponse();
-        $response = $this->client()->request('GET', '/');
-        $this->assertSame(200, $response->getStatusCode());
+        $this->mockResponse([], 500)->mockResponse([], 500);
+        $response = $this->httpClient()->httpErrors(false)->castResponse(false)->get('http://localhost/demo');
+        $this->assertCount(2, $this->historyRequest());
+        $this->assertEquals(500, $response->getStatusCode());
     }
 
     /**
+     * Test maximum number of retries reached.
+     *
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function testRetryConnectException()
+    public function testMaxRetryTimesReached()
     {
-        $this->appendException(new ConnectException('connect error', new Request('GET', '/')));
-        $this->appendResponse();
+        $this->mockResponse(['data' => 'The 1st response.'], 500)
+            ->mockResponse(['data' => 'The 2nd response.'], 500)
+            ->mockResponse(['data' => 'The 3rd response.'], 200);
 
-        $response = $this->client()->request('GET', '/');
-        $this->assertSame(200, $response->getStatusCode());
-    }
-
-    /**
-     * @throws \GuzzleHttp\Exception\GuzzleException
-     */
-    public function testRetry500Response()
-    {
-        $this->appendResponse(500)->appendResponse();
-        $response = $this->client()->request('GET', '/', ['http_errors' => false]);
-        $this->assertSame(200, $response->getStatusCode());
-    }
-
-    /**
-     * @throws \GuzzleHttp\Exception\GuzzleException
-     */
-    public function testRetryOutOfLimit()
-    {
-        $this->appendResponse(500)->appendResponse(501)->appendResponse();
-        $response = $this->client()->request('GET', '/', ['http_errors' => false]);
-        $this->assertSame(501, $response->getStatusCode());
+        $response = $this->httpClient()->httpErrors(false)->get('http://localhost/demo');
+        $this->assertCount(2, $this->historyRequest());
+        $this->assertEquals('The 2nd response.', $response['data']);
     }
 }

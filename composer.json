@@ -10,19 +10,18 @@
         }
     ],
     "require": {
-        "php": ">7.1",
+        "php": ">=5.5",
         "ext-json": "*",
         "ext-curl": "*",
+        "ext-mbstring": "*",
+        "ext-simplexml": "*",
+        "ext-libxml": "*",
         "psr/log": "~1.0",
-        "guzzlehttp/guzzle": "~6.0|~7.0",
-        "f-oris/easy-logger": "^1.0",
-        "f-oris/easy-cache": "^1.0",
-        "f-oris/easy-support": "^1.0"
+        "guzzlehttp/guzzle": "^6.0|^7.0"
     },
     "require-dev": {
-        "phpunit/phpunit": "^8.1",
-        "mockery/mockery": "^1.2",
-        "fzaninotto/faker": "^1.8"
+        "phpunit/phpunit": "^4.0",
+        "mockery/mockery": "^0.9|^1.0"
     },
     "autoload": {
         "psr-4": {
@@ -33,6 +32,9 @@
         "psr-4": {
             "Foris\\Easy\\HttpClient\\Tests\\": "tests/"
         }
+    },
+    "suggest": {
+        "f-oris/easy-logger": "A simple http-client logger extension."
     },
     "scripts": {
         "test": "vendor/bin/phpunit"
