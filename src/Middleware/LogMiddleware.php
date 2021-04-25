@@ -13,13 +13,6 @@ use Psr\Log\LogLevel;
 class LogMiddleware extends Middleware
 {
     /**
-     * The middleware executed before current.
-     *
-     * @var bool
-     */
-    protected $after = RetryMiddleware::class;
-
-    /**
      * Gets the logger instance
      *
      * @return LoggerInterface
