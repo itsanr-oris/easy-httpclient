@@ -50,21 +50,48 @@ trait HttpTestSuite
 
     /**
      * Set up http client instance.
+     *
+     * @return HttpTestSuite
      */
     protected function setUpHttpClient()
+    {
+        return $this->setUpMockHandler()->setUpHttpHistory();
+    }
+
+    /**
+     * Set up http response mock handler.
+     *
+     * @return $this
+     */
+    public function setUpMockHandler()
     {
         $handlerStack = $this->httpClient()->getHandlerStack();
 
         // 模拟http结果响应
         if ($this->httpMock) {
-            $handlerStack->setHandler($this->mockHandler());
+            $handlerStack->setHandler($this->mockHandler(true));
         }
+
+        $this->httpClient()->setHandlerStack($handlerStack);
+
+        return $this;
+    }
+
+    /**
+     * Set up http request history logger.
+     *
+     * @return $this
+     */
+    public function setUpHttpHistory()
+    {
+        $handlerStack = $this->httpClient()->getHandlerStack();
 
         // 记录请求历史
         $this->historyRequest = [];
         $handlerStack->push(Middleware::history($this->historyRequest));
 
         $this->httpClient()->setHandlerStack($handlerStack);
+
         return $this;
     }
 
@@ -94,11 +121,12 @@ trait HttpTestSuite
     /**
      * Gets the mock handler instance.
      *
+     * @param bool $newInstance
      * @return MockHandler
      */
-    protected function mockHandler()
+    protected function mockHandler($newInstance = false)
     {
-        if (empty($this->mockHandler)) {
+        if ($newInstance || empty($this->mockHandler)) {
             $this->mockHandler = new MockHandler();
         }
 
@@ -167,7 +195,12 @@ trait HttpTestSuite
      */
     protected function resetHttpMockResponse()
     {
-        $this->mockHandler()->reset();
+        if (method_exists($this->mockHandler(), 'reset')) {
+            $this->mockHandler()->reset();
+        } else {
+            $this->setUpMockHandler();
+        }
+
         return $this;
     }
 
@@ -319,7 +352,7 @@ trait HttpTestSuite
      * Determine whether a request is consistent with the given parameters.
      *
      * @param Request $request
-     * @param string  $uri
+     * @param \Psr\Http\Message\UriInterface  $uri
      * @param string  $method
      * @param array   $options
      * @return bool
@@ -352,12 +385,13 @@ trait HttpTestSuite
      * Determine whether a request is consistent with the given uri.
      *
      * @param Request $request
-     * @param         $uri
+     * @param \Psr\Http\Message\UriInterface $uri
      * @return false|int
      */
     private function isUri(Request $request, $uri)
     {
-        return stripos((string)$request->getUri(), (string)$uri) === 0;
+        $requestUri = empty($uri->getQuery()) ? $request->getUri()->withQuery('') : $request->getUri();
+        return (string) $requestUri == (string) $uri;
     }
 
     /**

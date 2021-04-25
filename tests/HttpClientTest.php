@@ -125,4 +125,20 @@ class HttpClientTest extends TestCase
         $this->httpClient()->request('http://localhost/demo', 'PUT', ['body' => 'test body content']);
         $this->assertRequestWasSent('http://localhost/demo', 'PUT', ['body' => 'test body content']);
     }
+
+    /**
+     * Test assert request with uri params.
+     *
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function testAssertRequestWithUriParams()
+    {
+        $this->mockResponse();
+        $this->httpClient()->get('', ['key' => 'value']);
+        $this->assertGetRequestWasSent('', ['key' => 'value']);
+
+        $this->mockResponse();
+        $this->httpClient()->request('http://localhost?k1=v1&k2=v2');
+        $this->assertRequestWasSent('http://localhost?k1=v1&k2=v2');
+    }
 }
